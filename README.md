@@ -254,6 +254,33 @@ const type = data.type;
 type: "getEmotion" 返回情绪信息 
 ...待对接完善
 
+##### 陪练WS接口以及返回值
+```
+/*
+ * 参数说明：
+ * @params {userUuid} 用户ID
+ * @params {groupId} 课程组ID
+ * @params {courseId} 课程id
+ * @params {resultType} 对练类型 0 练习 | 1 考试
+ * @params {callId} 会话ID （默认前端传null）
+ */
+ 
+WS: ws://ip:31189/trainning/speech/{userUuid}/{groupId}/{courseId}/{resultType}/{callId}
+
+respones
+
+{
+    "asrText":"喂。" //asr转义文本,
+    "audioId":"8k_stu_a989ae5044d44d39ae5785855117512c46c6f624-0492-4e8b-8b09-d5ddd3993aab" //录音id,
+    "callId":"a989ae5044d44d39ae5785855117512c" //会话id,
+    "direction":0, //角色 1:客户 0:坐席
+    "end":false, //是否结束
+    "resultId":348, //对练记录id
+    "sensitiveWordList":[ ], //敏感词 目前有一个傻瓜
+    "speed":86,//语速
+}
+
+```
 
 
 
