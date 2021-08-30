@@ -1,5 +1,13 @@
 import axios from "axios"
 
+const axiosInstance = axios.create({
+    baseURL: "/api",
+    timeout: 10000,
+    headers: {
+        Authorization : `Bearer ${window.localStorage.getItem("_token")}`
+    }
+})
+
 const install = (app) => {
     let proto = app.config.globalProperties || app.prototype;
     proto.initServer = initServer;
@@ -30,8 +38,9 @@ const emotionState = {
 }
 
 const apiAndFormatter = {
+    // 情绪
     getEmotion: {
-        api: "https://localhost:16000/train/emotion/emotibotServer",
+        api: "/train/emotion/emotibotServer",
         responesFormatter: (respones) => {
             const primary = respones.data.emotion;
             respones = { emotion: primary, emotionText: emotionState[primary] }
@@ -40,10 +49,108 @@ const apiAndFormatter = {
         paramsFormatter: (params) => {
             const formData = new FormData();
             formData.append("file", params, "image.jpg");
-            formData.append("id", userOptions.userInfo.id);
-            formData.append("type", userOptions.resultType);
+            formData.append("id", userOptions.userInfo.info.id);
+            formData.append("type", userOptions.examinationType);
             formData.append("resultId", userOptions.resultId);
             return formData
+        }
+    },
+
+    // 陪练结果 打分
+    getResult: {
+        api: "/train/result/complex-result",
+        responesFormatter: (respones) => {
+            // {
+            //     "abilityModel" : {
+            //       "affinityAbility" : 0,
+            //       "languageAbility" : 0,
+            //       "logicAbility" : 0,
+            //       "reactionAbility" : 0,
+            //       "skillAbility" : 0
+            //     },
+            //     "audioId" : "string",
+            //     "audioQicRes" : {
+            //       "fastSpeedDuration" : "string",
+            //       "normalSpeedDuration" : "string",
+            //       "silenceDuration" : "string",
+            //       "silenceScore" : 0,
+            //       "slowSpeedDuration" : "string",
+            //       "speedTrendList" : [ {
+            //         "speed" : 0,
+            //         "time" : "string"
+            //       } ],
+            //       "speedTrendScore" : 0,
+            //       "suggestList" : [ "string" ],
+            //       "totalScore" : 0,
+            //       "totalStaffSpeakTime" : "string"
+            //     },
+            //     "beatPercent" : 0,
+            //     "complexScore" : 0,
+            //     "normsSpeechRes" : {
+            //       "dialogNodeList" : [ {
+            //         "nodeName" : "string",
+            //         "nodeType" : "string",
+            //         "refSpeech" : "string",
+            //         "ruleList" : [ {
+            //           "refSpeech" : "string",
+            //           "ruleName" : "string",
+            //           "ruleType" : "string",
+            //           "score" : 0,
+            //           "valid" : true
+            //         } ],
+            //         "score" : 0,
+            //         "yourAnswer" : "string"
+            //       } ],
+            //       "dialogNodescore" : 0,
+            //       "normsSpeechScore" : 0,
+            //       "sensitiveWordList" : [ {
+            //         "name" : "string",
+            //         "score" : 0,
+            //         "valid" : true
+            //       } ],
+            //       "sensitiveWordScore" : 0,
+            //       "suggestList" : [ "string" ]
+            //     },
+            //     "responseBean" : {
+            //       "emotionControlScore" : 0,
+            //       "emotionList" : [ {
+            //         "name" : "string"
+            //       } ],
+            //       "emotionPercentList" : [ {
+            //         "name" : "string",
+            //         "percent" : "string"
+            //       } ],
+            //       "emotionProportionScore" : 0,
+            //       "emotionTreeList" : [ {
+            //         "data" : [ "string" ],
+            //         "name" : "string"
+            //       } ],
+            //       "propose" : [ "string" ],
+            //       "timeList" : [ 0 ],
+            //       "totalScore" : 0
+            //     },
+            //     "segmentList" : [ {
+            //       "asr_text" : "string",
+            //       "emotion" : [ "string" ],
+            //       "end_time" : 0.0,
+            //       "segment_id" : 0,
+            //       "sent_id" : 0,
+            //       "speaker" : "string",
+            //       "start_time" : 0.0,
+            //       "status" : 0
+            //     } ]
+            //   }
+            return respones
+        },
+        paramsFormatter: (params) => {
+            // {
+            //     "callId" : "string",
+            //     "courseName" : "string",
+            //     "resultId" : 0,
+            //     "resultType" : 0,
+            //     "userUuid" : "string"
+            //   }
+            return params
         }
     }
 }
@@ -241,7 +348,9 @@ const midbag = (methodFn) => (apiAndFormatter, moduleName) => (data, options) =>
         .catch(mistake => UTILS.events.catch_notify(UTILS_PART.mistake_interface(moduleName, mistake)))
 }
 
-const post = midbag(axios.post);
+const post = midbag(axiosInstance.post);
+
+const get = midbag(axiosInstance.get);
 
 const _respones_notify = (type, res) => RES_CALLBACK.forEach(fn => fn({
     type, res
@@ -365,7 +474,11 @@ const UTILS = {
     },
     request: {
         post,
-        getEmotion: post(apiAndFormatter, "getEmotion")
+        getEmotion: post(apiAndFormatter, "getEmotion"),
+        getResult: () => {
+            UTILS.server.getServerInstance().closeConnect()
+            return get(apiAndFormatter, "getResult")
+        }
     }
 }
 
@@ -412,7 +525,8 @@ const UTILS_PART = {
                 reader.readAsArrayBuffer(encode);
                 reader.onload = (e) => {
                     const bufer = e.srcElement.result;
-                    const blob = audioJS.addWavHeader(bufer, 16000, 16, 1);
+                    //const blob = audioJS.addWavHeader(bufer, 16000, 16, 1);
+                    const blob = new Blob([bufer],  { type: 'audio/wav' })
                     resolve(window.URL.createObjectURL(blob))
                 };
             } catch (error) {
@@ -420,8 +534,13 @@ const UTILS_PART = {
             }
 
         })
+    },
+    getTime () {
+        return new Date().getTime()
     }
 };
+
+window.UTILS_PART = UTILS_PART;
 
 let FragmentConfig = {};
 // to Fragment Change
@@ -470,6 +589,7 @@ const _initServerLib = () => {
 const userOptions = _default_state_proxy({
     resultId: 0,
     resultType: "", // test 0 | examination 1 | testHistory 0 | examinationHistory 1
+    examinationType: 0, // 考试类型 0 练习 1考试
     userInfo: {}
 });
 
@@ -508,6 +628,7 @@ const ServerConnect = () => {
         UTILS.server.save(ClientServer);
     })
 }
+let recordStartTime = null;
 
 const initServer = (host, url) => {
     const SERVER = GETSERVER();
@@ -528,12 +649,17 @@ const initServer = (host, url) => {
         startRecorderAudio: start.bind(deviceInfo),
         stopRecorderAudio: (fn) => {
             let blob = getBlob.call(deviceInfo);
-            fn(blob, () => UTILS.events.send(blob))
+            fn({blob, recordStartTime, recordEndTime: UTILS_PART.getTime()}, () => UTILS.events.send(blob))
             clear.call(deviceInfo)
             stop.call(deviceInfo);
+            recordStartTime = null;
         },
-        setUser: (userInfo) => userOptions.userInfo = userInfo,
+        setUser: (userInfo) => {
+            userOptions.userInfo = userInfo;
+            window.localStorage.setItem("_token", userInfo.token)
+        },
         setResultType: (type) => userOptions.resultType = type,
+        setExaminationType: (type) => userOptions.examinationType = type,
         catch: (catchCallback) => CATCH_CALLBACK.push(catchCallback),
         closeVideo: () => {
             let video_opened = UTILS.media.getMediaStateDetail(STATE_VIDEO_OPEN);;
@@ -590,7 +716,7 @@ const initServer = (host, url) => {
             UTILS.media.setMediaInfo("timer", null);
             clearInterval(timer)
         },
-
+        getResult: UTILS.request.getResult
     })
 }
 
@@ -678,6 +804,7 @@ const start = function () {
         UTILS.events.catch_notify(UTILS_PART.mistake_interface("audioRecorderError", "recorder cannot connect before  audio stream inited"));
         return
     }
+    recordStartTime = UTILS_PART.getTime();
     _respones_notify("audioRecorder", "aduio recorder start")
     this.audioInput.connect(this.recorder);
     this.recorder.connect(this.audioContext.destination);
@@ -704,10 +831,10 @@ const clear = function () {
 // 视频分析，按dely间隔进行
 const analysisVideoFragment = (video, option) => {
     let timer = setInterval(() => {
+        if (GETSERVER()[STATE_CONNECTION] == 0) return;
+        //if (!userOptions.resultId) return;
         UTILS_PART.getPhotoFromVideo(video).then(bolb => {
-            //UTILS.events.respones_notify("monitor", bolb)
-            if (GETSERVER()[STATE_CONNECTION] == 0) return;
-            if (!userOptions.resultId) return;
+            UTILS.events.respones_notify("monitor", bolb)
             UTILS.request.getEmotion(bolb, { headers: { "Content-Type": "multipart/form-data" } })
         })
     }, option.videoOpts.dely || 1000);
