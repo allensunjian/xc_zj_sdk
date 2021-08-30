@@ -832,7 +832,7 @@ const clear = function () {
 const analysisVideoFragment = (video, option) => {
     let timer = setInterval(() => {
         if (GETSERVER()[STATE_CONNECTION] == 0) return;
-        //if (!userOptions.resultId) return;
+        if (!userOptions.resultId) return;
         UTILS_PART.getPhotoFromVideo(video).then(bolb => {
             UTILS.events.respones_notify("monitor", bolb)
             UTILS.request.getEmotion(bolb, { headers: { "Content-Type": "multipart/form-data" } })
